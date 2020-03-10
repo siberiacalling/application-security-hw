@@ -1,19 +1,10 @@
-const fs = require('fs');
-const net = require('net');
 const http = require('http');
-const https = require('https');
+const net = require('net');
 const urlapi = require('url');
 
-const httpAddress = 3001;
-const httpsAddress = 3002;
-const httpsOptions = {
-  key: fs.readFileSync('./conf/localhost+1-key.pem'),
-  cert: fs.readFileSync('./conf/localhost.pem')
-};
-
-
 const httpConnection = (req, res) => {
-  console.log("http");
+  console.log("httpConnection handler");
+
   const currentUrl = urlapi.parse(req.url);
   const options = {
     host: currentUrl.hostname,
@@ -34,27 +25,18 @@ const httpConnection = (req, res) => {
   req.pipe(serverRequest);
 }
 
-const httpsConnection = (req, res) => {
-  console.log("https");
-  // res.setHeader('Content-Type', 'text/html');
-  // res.setHeader('X-Foo', 'bar');
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('ok\n');
-  // const currentUrl = urlapi.parse(req.url);
-  // const options = {
-  //   host: currentUrl.hostname,
-  //   port: currentUrl.port,
-  //   path: currentUrl.pathname,
-  //   method: req.method,
-  //   headers: req.headers,
-  // };
 
-  // const serverRequest = https.request(options, (serverResponse) => {
-  //   res.writeHead(serverResponse.statusCode, serverResponse.headers);
-  //   serverResponse.pipe(res);
-  // });
-  // req.pipe(serverRequest);
-}
+const proxy = http.createServer(httpConnection).listen(8080);
+proxy.on('connect', (req, clientSocket, head) => {
+  const { port, hostname } = new urlapi.URL(`http://${req.url}`);
 
-http.createServer(httpConnection).listen(httpAddress);
-https.createServer(httpsOptions, httpsConnection).listen(httpsAddress);
+  console.log(port, hostname);
+  const serverSocket = net.connect(port || 80, hostname, () => {
+    clientSocket.write('HTTP/1.1 200 Connection Established\r\n' +
+      'Proxy-agent: Node.js-Proxy\r\n' +
+      '\r\n');
+    serverSocket.write(head);
+    serverSocket.pipe(clientSocket);
+    clientSocket.pipe(serverSocket);
+  });
+});
