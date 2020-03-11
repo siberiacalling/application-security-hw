@@ -42,27 +42,27 @@ const execAllCommands = async (commands) => {
   try {
     await execOneCommand(commands[0]);
   } catch (error) {
-    console.error(error);
+    // console.error(error);
   }
   try {
     await execOneCommand(commands[1]);
   } catch (error) {
-    console.error(error);
+    // console.error(error);
   }
   try {
     await execOneCommand(commands[2]);
   } catch (error) {
-    console.error(error);
+    // console.error(error);
   }
   try {
     await execOneCommand(commands[3]);
   } catch (error) {
-    console.error(error);
+    // console.error(error);
   }
   try {
     await execOneCommand(commands[4]);
   } catch (error) {
-    console.error(error);
+    // console.error(error);
   }
   return;
 }
@@ -143,10 +143,10 @@ proxy.on("connect", async (req, browserSocket, head) => {
           tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
         });
         proxyRequest.on('error', (error) => {
-          console.log("\n\nproxyRequest socket ", error);
+          // console.log("\n\nproxyRequest socket ", error);
         });
       } catch (error) {
-        console.error(error);
+        // console.error(error);
       }
     });
 });
