@@ -55,8 +55,20 @@ const generateOptionsByHostName = async (hostname) => {
     await execAllCommands(commands);
   }
   const options = {
-    key: fs.readFileSync("./conf/" + hostname + ".key"),
-    cert: fs.readFileSync("./conf/" + hostname + ".crt")
+    key: () => {
+      try {
+        fs.readFileSync("./conf/" + hostname + ".key")
+      } catch (e) {
+        console.error(error);
+      }
+    },
+    cert: () => {
+      try {
+        fs.readFileSync("./conf/" + hostname + ".crt")
+      } catch (e) {
+        console.error(error);
+      }
+    }
   };
   return options;
 }
@@ -83,11 +95,11 @@ proxy.on("connect", (req, browserSocket, head) => {
   tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
 
   tlsProxy.on('error', (error) => {
-    console.log(error);
+    // console.log("\n\ntlsProxy socket ", error);
   });
 
-  tlsProxy.on('data', (chunck) => {
-    console.log(chunck.toString("ascii"));
+  proxyRequest.on('error', (error) => {
+    // console.log("\n\nproxyRequest socket ", error);
   });
 });
 
