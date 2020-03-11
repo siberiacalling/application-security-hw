@@ -6,6 +6,7 @@ const fs = require("fs");
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 
+
 const httpConnection = (req, res) => {
   console.log("httpConnection handler");
 
@@ -25,51 +26,34 @@ const httpConnection = (req, res) => {
   req.pipe(serverRequest);
 }
 
-const execAllCommands = async (command) => {
-  //commands.forEach(async (command) => {
-  const { stdout, stderr } = await exec(command);
-  if (stderr) {
-    console.log(`stderr: ${stderr}`);
-    return;
+
+const execOneCommand = async (command, i) => {
+  try {
+    const { stdout, stderr } = await exec(command, { cwd: './conf' });
+  } catch (error) {
+    console.error(error);
   }
-  if (stdout) {
-    console.log(`stdout: ${stdout}`);
-    return;
-  }
-  //});
 }
 
-// const execAllCommands = (commands) => {
-//   commands.forEach((command) => {
-//     exec(command, (error, stdout, stderr) => {
-//       if (error) {
-//         console.log("ERROR:\n", command);
-//         console.log(`error: ${error.message}`);
-//         return;
-//       }
-//       if (stderr) {
-//         console.log(`stderr: ${stderr}`);
-//         return;
-//       }
-//       if (stderr) {
-//         console.log(`stdout: ${stdout}`);
-//         return;
-//       }
-//     });
-//   });
-// }
+const execAllCommands = async (commands) => {
+  await execOneCommand(commands[0], 0);
+  await execOneCommand(commands[1], 1);
+  await execOneCommand(commands[2], 2);
+  await execOneCommand(commands[3], 3);
+  await execOneCommand(commands[4], 4);
+}
 
-const generateOptionsByHostName = (hostname) => {
-  const commands = [
-    // "openssl genrsa -out " + hostname + ".key " + " 2048",
-    // "openssl req -new -sha256 -key " + hostname + ".key -subj \"/C=US/ST=CA/O=MyOrg, Inc./CN=" + hostname + "\"" + " -out " + hostname + ".csr",
-    // "openssl req -in " + hostname + ".csr -noout -text",
-    // "openssl x509 -req -in " + hostname + ".csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out " + hostname + ".crt -days 500 -sha256",
-    // "openssl x509 -in " + hostname + ".crt -text -noout",
-  ];
+const generateOptionsByHostName = async (hostname) => {
 
-  // execAllCommands(commands);
-
+  if (!(fs.existsSync("./conf/" + hostname + ".key") && fs.existsSync("./conf/" + hostname + ".key"))) {
+    const commands = [
+      "openssl genrsa -out " + hostname + ".key " + " 2048",
+      "openssl req -new -sha256 -key " + hostname + ".key -subj \"/C=US/ST=CA/O=MyOrg, Inc./CN=" + hostname + "\"" + " -out " + hostname + ".csr",
+      "openssl req -in " + hostname + ".csr -noout -text",
+      "openssl x509 -req -in " + hostname + ".csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out " + hostname + ".crt -days 500 -sha256",
+      "openssl x509 -in " + hostname + ".crt -text -noout"];
+    await execAllCommands(commands);
+  }
   const options = {
     key: fs.readFileSync("./conf/" + hostname + ".key"),
     cert: fs.readFileSync("./conf/" + hostname + ".crt")
@@ -98,52 +82,12 @@ proxy.on("connect", (req, browserSocket, head) => {
   const tlsProxy = new tls.TLSSocket(browserSocket, optionsTLC);
   tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
 
-  tlsProxy.on('error', (error)=>{
+  tlsProxy.on('error', (error) => {
     console.log(error);
   });
 
-  tlsProxy.on('data', (chunck)=>{
+  tlsProxy.on('data', (chunck) => {
     console.log(chunck.toString("ascii"));
   });
 });
-
-// const serverSocket = tls.connect(port || 80, hostname, options, () => {
-//   clientSocket.write("HTTP/1.1 200 Connection Established\r\n" +
-//     "Proxy-agent: Node.js-Proxy\r\n" +
-//     "\r\n");
-//   if (serverSocket.authorized) {
-//     console.log("authorized");
-//   } else {
-//     console.log("NOT authorized: " + serverSocket.authorizationError)
-//   }
-//   serverSocket.write("I am the client sending you a message.");
-//   // serverSocket.write(head);
-//   // serverSocket.pipe(clientSocket);
-//   // clientSocket.pipe(serverSocket);
-// });
-
-// serverSocket.on("error", (error) => {
-//   console.error(error);
-//   serverSocket.destroy();
-// });
-
-// serverSocket.on("data", function (data) {
-//   console.log("Received: %s [it is %d bytes long]",
-//     data.toString().replace(/(\n)/gm, ""),
-//     data.length);
-//   client.end();
-// });
-
-// serverSocket.on("close", function () {
-//   console.log("Connection closed");
-// });
-
-// const serverSocket = net.connect(port || 80, hostname, () => {
-//   clientSocket.write("HTTP/1.1 200 Connection Established\r\n" +
-//     "Proxy-agent: Node.js-Proxy\r\n" +
-//     "\r\n");
-//   serverSocket.write(head);
-//   serverSocket.pipe(clientSocket);
-//   clientSocket.pipe(serverSocket);
-// });
 
