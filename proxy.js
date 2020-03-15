@@ -4,12 +4,37 @@ const tls = require("tls");
 const fs = require("fs");
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const Datastore = require('nedb');
+const path = require('path');
+
+const directory = 'conf';
+
+fs.readdir(directory, (err, files) => {
+  if (err) throw err;
+
+  for (const file of files) {
+    if ((file !== "rootCA.crt") && (file !== "rootCA.key")) {
+      fs.unlink(path.join(directory, file), err => {
+        if (err) throw err;
+      });
+    }
+
+  }
+});
+
+fs.unlink('./requests', (err) => {
+  if (err) {
+    throw err;
+  };
+});
+
+const db = new Datastore({ filename: 'requests' });
+db.loadDatabase();
 
 let requestsAmount = 0;
 console.log("Proxy running on port 8080");
+console.log("Type request id in console to repeat request");
 const httpConnection = (req, res) => {
-  // console.log("httpConnection handler");
-
   const currentUrl = urlapi.parse(req.url);
   const options = {
     host: currentUrl.hostname,
@@ -28,6 +53,7 @@ const httpConnection = (req, res) => {
   });
   req.pipe(serverRequest);
 }
+
 
 
 const execOneCommand = async (command) => {
@@ -103,11 +129,44 @@ const generateOptionsByHostName = async (hostname) => {
   return options;
 }
 
-const proxy = http.createServer(httpConnection).listen(8080);
 
+const getIndicesOf = (toSearch, str) => {
+  let indices = [];
+  for (let pos = str.indexOf(toSearch); pos !== -1; pos = str.indexOf(toSearch, pos + 1)) {
+    indices.push(pos);
+  }
+  return indices;
+}
+
+const createSubstringsByIndex = (string, allIndexes) => {
+  let requests = [];
+  if (allIndexes.length > 1) {
+    for (let i = 0; i < allIndexes.length - 1; i++) {
+      requests.push(string.substr(allIndexes[i], allIndexes[i + 1]));
+    }
+    requests.push(string.substr(allIndexes[allIndexes.length - 1], string.length));
+  }
+  return requests;
+}
+
+const parseString = (string) => {
+  let getIndexes = getIndicesOf("GET ", string, true);
+  let postIndexes = getIndicesOf("POST ", string, true);
+  let allIndexes = getIndexes.concat(postIndexes);
+  allIndexes = allIndexes.sort((a, b) => { return a - b });
+  let requestsArray = [];
+  if (allIndexes.length > 1) {
+    requestsArray = createSubstringsByIndex(string, allIndexes);
+  } else {
+    requestsArray.push(string);
+  }
+  return requestsArray;
+}
+
+const proxy = http.createServer(httpConnection).listen(8080);
 proxy.on("connect", async (req, browserSocket, head) => {
 
-  let currentRequest = "";
+  let currentRequest = ""
   browserSocket.on('error', (error) => {
     // console.log("\n\nproxyRequest socket ", error);
   });
@@ -142,7 +201,6 @@ proxy.on("connect", async (req, browserSocket, head) => {
             // console.log("NOT Autorized", hostname);
           }
           proxyRequest.write(head);
-          //tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
           proxyRequest.pipe(tlsProxy);
         });
         proxyRequest.on('error', (error) => {
@@ -151,18 +209,23 @@ proxy.on("connect", async (req, browserSocket, head) => {
 
         tlsProxy.on('data', (data) => {
           currentRequest += data.toString("ascii");
-          //console.log(data.toString("ascii"));
           proxyRequest.write(data);
         });
 
       } catch (error) {
         // console.error(error);
       }
+
       tlsProxy.on('end', (data) => {
-        requestsAmount++;
-        console.log(currentRequest);
-        console.log("END ", requestsAmount, "\n");
-        //currentRequest = "";
+        if (currentRequest !== "") {
+          const requestsArray = parseString(currentRequest);
+          requestsArray.forEach((req) => {
+            requestsAmount++;
+            db.insert({ id: requestsAmount, request: req });
+            console.log("\nREQUEST ID", requestsAmount);
+            console.log(req);
+          });
+        }
       });
     });
 });
