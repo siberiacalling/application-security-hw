@@ -5,6 +5,7 @@ const fs = require("fs");
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 
+let requestsAmount = 0;
 console.log("Proxy running on port 8080");
 const httpConnection = (req, res) => {
   // console.log("httpConnection handler");
@@ -105,6 +106,8 @@ const generateOptionsByHostName = async (hostname) => {
 const proxy = http.createServer(httpConnection).listen(8080);
 
 proxy.on("connect", async (req, browserSocket, head) => {
+
+  let currentRequest = "";
   browserSocket.on('error', (error) => {
     // console.log("\n\nproxyRequest socket ", error);
   });
@@ -137,17 +140,29 @@ proxy.on("connect", async (req, browserSocket, head) => {
             // console.log("Autorized", hostname);
           } else {
             // console.log("NOT Autorized", hostname);
-
           }
           proxyRequest.write(head);
-          tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
+          //tlsProxy.pipe(proxyRequest).pipe(tlsProxy);
+          proxyRequest.pipe(tlsProxy);
         });
         proxyRequest.on('error', (error) => {
           // console.log("\n\nproxyRequest socket ", error);
         });
+
+        tlsProxy.on('data', (data) => {
+          currentRequest += data.toString("ascii");
+          //console.log(data.toString("ascii"));
+          proxyRequest.write(data);
+        });
+
       } catch (error) {
         // console.error(error);
       }
+      tlsProxy.on('end', (data) => {
+        requestsAmount++;
+        console.log(currentRequest);
+        console.log("END ", requestsAmount, "\n");
+        //currentRequest = "";
+      });
     });
 });
-
