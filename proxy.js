@@ -7,7 +7,54 @@ const exec = util.promisify(require('child_process').exec);
 const Datastore = require('nedb');
 const path = require('path');
 
+const stdin = process.openStdin();
+
 const directory = 'conf';
+
+const getIndicesOf = (toSearch, str) => {
+  let indices = [];
+  for (let pos = str.indexOf(toSearch); pos !== -1; pos = str.indexOf(toSearch, pos + 1)) {
+    indices.push(pos);
+  }
+  return indices;
+}
+
+const findHost = (request) => {
+  const hostIndex = request.indexOf("Host: ");
+  const hostBegin = hostIndex + 6;
+  let host = "";
+  let i = hostBegin;
+  
+  while (request.charAt(i) != '\n') {
+    host += request.charAt(i);
+    i++;
+  }
+  console.log("HOST:");
+  console.log(host);
+  return host;
+}
+
+stdin.addListener("data", (data) => {
+  const requestId = Number(data.toString().trim());
+  console.log("Repeat request with id: " +
+    requestId);
+  db.find({ id: requestId }, (err, obj) => {
+    console.log(obj[0].request);
+    const hostname = findHost(obj[0].request);
+    try {
+      const proxyRequest = tls.connect(port || 80, hostname, options, () => {
+        proxyRequest.write(obj[0].request);
+        proxyRequest.pipe(process.stdout);
+      });
+      proxyRequest.on('error', (error) => {
+        console.log("\n\Request by id socket ", error);
+      });
+
+    } catch (error) {
+      // console.error(error);
+    }
+  });
+});
 
 fs.readdir(directory, (err, files) => {
   if (err) throw err;
@@ -18,13 +65,12 @@ fs.readdir(directory, (err, files) => {
         if (err) throw err;
       });
     }
-
   }
 });
 
-fs.unlink('./requests', (err) => {
-  if (err) {
-    throw err;
+fs.unlink('requests', (err) => {
+  if (err && err.code == 'ENOENT') {
+    // throw err;
   };
 });
 
@@ -130,13 +176,7 @@ const generateOptionsByHostName = async (hostname) => {
 }
 
 
-const getIndicesOf = (toSearch, str) => {
-  let indices = [];
-  for (let pos = str.indexOf(toSearch); pos !== -1; pos = str.indexOf(toSearch, pos + 1)) {
-    indices.push(pos);
-  }
-  return indices;
-}
+
 
 const createSubstringsByIndex = (string, allIndexes) => {
   let requests = [];
