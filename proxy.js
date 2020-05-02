@@ -36,20 +36,33 @@ const findHost = (request) => {
 
 stdin.addListener("data", (data) => {
   const requestId = Number(data.toString().trim());
-  console.log("Repeat request with id: " +
-    requestId);
+  currentResponse = "";
+
   db.find({ id: requestId }, (err, obj) => {
+     console.log(obj);
     console.log(obj[0].request);
     const hostname = findHost(obj[0].request);
     try {
       const proxyRequest = tls.connect(port || 80, hostname, options, () => {
         proxyRequest.write(obj[0].request);
-        proxyRequest.pipe(process.stdout);
+        // proxyRequest.pipe(process.stdout);
       });
       proxyRequest.on('error', (error) => {
         console.log("\n\Request by id socket ", error);
       });
 
+      proxyRequest.on('data', (data) => {
+        console.log("DATA: ");
+         console.log(data.toString("ascii"));
+          currentResponse += data.toString("ascii");
+      });
+
+      proxyRequest.on('end', () => {
+        console.log("Repeat request with id" +
+    requestId + ":" );
+console.log(currentResponse)
+      });
+        
     } catch (error) {
       // console.error(error);
     }
@@ -264,6 +277,7 @@ proxy.on("connect", async (req, browserSocket, head) => {
             db.insert({ id: requestsAmount, request: req });
             console.log("\nREQUEST ID", requestsAmount);
             console.log(req);
+            console.log("END");
           });
         }
       });
